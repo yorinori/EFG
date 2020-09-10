@@ -53,20 +53,6 @@ y_aux = np.concatenate(np.hsplit(y_aux, nx+1))  # it's nx. It's right
 x_node = np.hstack((x_aux, y_aux))
 
 """
-# Former approach
-
-index = 0
-x_node = np.zeros(x_aux.size)
-y_node = np.zeros(y_aux.size)
-for i in range(0,25):
-  for j in range(0,7):
-    x_node[index] = x_aux[j][i]
-    y_node[index] = y_aux[j][i]
-    index = index + 1
-"""
-
-
-"""
 
 Background Cells
 ------------------
@@ -91,19 +77,6 @@ y_aux = np.concatenate(np.hsplit(y_aux, nx_BKC+1))  # it's nx. It's right
 
 x_BKC = np.hstack((x_aux, y_aux))
 
-"""
-#Former approach
-
-index = 0
-x_BC = np.zeros(x_aux.size)
-y_BC = np.zeros(y_aux.size)
-for i in range(0,nx_BC+1):
-  for j in range(0,ny_BC+1):
-    print( 'i=', i, 'j=', j, '  coord =(',x_aux[j][i],' , ', y_aux[j][i], ')   index=',index )
-    x_BC[index] = x_aux[j][i]
-    y_BC[index] = y_aux[j][i]
-    index = index + 1
-"""
 # Setting vertices for each background cell
 V4Cell = []
 for i in range(nx_BKC):
