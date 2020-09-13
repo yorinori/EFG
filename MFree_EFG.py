@@ -235,6 +235,26 @@ for iNBC in range(len(NodeNBC_concentrated)):
 print("Resolvendo o sistema")
 U = np.matmul(inv(Kglobal), force)
 
+# --- Analytical solution
+
+Ua_x = np.zeros(numNode)
+Ua_y = np.zeros(numNode)
+for i in range(numNode):
+    x = xi_node[i]
+    y = yi_node[i]
+    aux1 = (P * y)/(6. * E * Imo)
+    aux2 = (6. * L - 3. * x) * x
+    aux3 = (2. + poisson) * ((y**2.) - ((H**2.)/(4.)))
+
+    Ua_x[i] = aux1 * (aux2 + aux3)
+
+    aux1 = -P/(6. * E * Imo)
+    aux2 = (3. * poisson * y**2.) * (L - x)
+    aux3 = (4. + 5. * poisson) * ((H**2. * x)/4.)
+    aux4 = (3. * L - x) * x**2.
+
+    Ua_y[i] = aux1 * (aux2 + aux3 + aux4)
+
 # --- Get displacement
 
 disp = np.zeros(2*numNode)
@@ -250,14 +270,80 @@ for iNode in range(numNode):
 
     for i in range(n):
         I = maskpos[i]
-        disp[2*I] += phi[i] * U[2*I]
-        disp[2*I+1] += phi[i] * U[2*I+1]
+        disp[2*iNode] += phi[i] * U[2*I]
+        disp[2*iNode+1] += phi[i] * U[2*I+1]
 
 Ux = np.zeros(numNode)
 Uy = np.zeros(numNode)
 for iNode in range(numNode):
-    print('{:5d},   {:+0.5e},   {:+0.5e}   {:+0.5e},   {:+0.5e}'.format(
-              iNode, disp[2*iNode], disp[2*iNode+1], U[2*iNode], U[2*iNode+1]))
+    print('{:5d},   {:+0.5e},   {:+0.5e}   {:+0.5e},   {:+0.5e} {:+0.5e},   {:+0.5e}'.format(
+              iNode, Ua_x[iNode], U[2*iNode], disp[2*iNode], Ua_y[iNode], U[2*iNode+1],disp[2*iNode+1]))
 
     Ux[iNode] = xi_node[iNode] + disp[2*iNode]
     Uy[iNode] = yi_node[iNode] + disp[2*iNode+1]
+
+# --- Get Stress
+
+Dinv = inv(D)
+enorm = 0.
+# --- Compute energy error
+
+# Big loop for background cells
+for ibc in range(numBKC):
+
+    # Coordinates of background points in real space
+    xe = x_BKC[V4Cell[ibc]]
+
+    # --- Set Gauss points for this cell ---/
+    x_gauss, y_gauss, weight, jac = CellGaussPoints(xe, ND)
+
+    # --- Loop over Gauss points to assemble discrete equations ---/
+    for igp in range(0, ngauss2D):
+        Stress = np.zeros(3)
+        Stress_exact = np.zeros(3)
+        # --- Determine the support domain of Gauss point ---/
+        mask, maskpos, n = SupportDomain(
+                        x_gauss[igp], y_gauss[igp], dsx, dsy, xi_node, yi_node)
+
+        # --- Construct MLS shape functions for a Gauss point ---/
+
+        poi = x_gauss[igp], y_gauss[igp]
+
+        phi, dphix, dphiy = MLS_ShapeFunc(
+                                    poi, x_node[mask], n, dsx[mask], dsy[mask])
+
+        # --- Compute the Stiffness matrix for a Gauss point
+        Bmat = np.array([]).reshape(3, 0)
+        uu = np.array([]).reshape(0)
+        for i in range(n):
+
+            B_i = np.array([[dphix[i],       0.],
+                            [0.,       dphiy[i]],
+                            [dphiy[i], dphix[i]]])
+
+            Bmat = np.hstack([Bmat, B_i])
+            I = maskpos[i]
+            uu = np.hstack([uu, disp[2*I: (2*I+1)+1]])
+
+        uu = uu.reshape(2*n, 1)
+        Stress = np.matmul(D, np.matmul(Bmat, uu))
+
+        # --- Exact stress for beam problem
+        Stress_exact[0] = (1./Imo) * P * (L - poi[0]) * poi[1]
+        Stress_exact[1] = 0.
+        Stress_exact[2] = -0.5 * (P/Imo) * (0.25 * (H**2.) - poi[1]**2.)
+
+        err = Stress.ravel() - Stress_exact
+
+        der = np.zeros(3)
+        for jer in range(3):
+            for ker in range(3):
+                der[jer] += Dinv[jer, ker] * err[ker]
+
+        err2 = 0.
+        for mer in range(3):
+            err2 += weight[igp] * jac[igp] * (0.5 * der[mer] * err[mer])
+        enorm += err2
+    # End of Loop for gauss points
+# End of Big Loop for background cells
+enorm = np.sqrt(enorm)
