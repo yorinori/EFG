@@ -21,13 +21,13 @@ from input import NodeEBC, EBC, pAlf
 from input import NodeNBC_concentrated, NBC_concentrated
 
 
-def SupportDomain(x_poi, y_poi, dsx, dsy, x, y):
+def SupportDomain(poi, dsx, dsy, x, y):
     """
     Parameters
     ----------
-    x_poi : numpy.float64
+    poi : numpy.float64, numpy.float64
+      (x_poi, y_poi)
       x coordinate of the point of interest (very often a Gauss point)
-    y_poi : numpy.float64
       y coordinate of the point of interest (very often a Gauss Point)
     dsx : numpy.ndarray
       Support domain size in x direction for each node
@@ -50,8 +50,8 @@ def SupportDomain(x_poi, y_poi, dsx, dsy, x, y):
     ref = 1.73864796e-18
     length = len(dsx)
 
-    dx = dsx - np.abs(x_poi * np.ones(length) - x)
-    dy = dsy - np.abs(y_poi * np.ones(length) - y)
+    dx = dsx - np.abs(poi[0] * np.ones(length) - x)
+    dy = dsy - np.abs(poi[1] * np.ones(length) - y)
 
     mask = (dx >= ref) & (dy >= ref)
     maskpos = np.where((dx >= ref) & (dy >= ref))[0]
@@ -109,14 +109,12 @@ for ibc in range(numBKC):
 
     # --- Loop over Gauss points to assemble discrete equations ---/
     for igp in range(0, ngauss2D):
-
+        poi = x_gauss[igp], y_gauss[igp]
+        
         # --- Determine the support domain of Gauss point ---/
-        mask, maskpos, n = SupportDomain(
-                        x_gauss[igp], y_gauss[igp], dsx, dsy, xi_node, yi_node)
+        mask, maskpos, n = SupportDomain(poi, dsx, dsy, xi_node, yi_node)
 
         # --- Construct MLS shape functions for a Gauss point ---/
-
-        poi = x_gauss[igp], y_gauss[igp]
 
         phi, dphix, dphiy = MLS_ShapeFunc(
                                     poi, x_node[mask], n, dsx[mask], dsy[mask])
@@ -168,11 +166,11 @@ for iNBC in range(len(NBC_distributed)):
         Ty = (-P/(2.*Imo)) * (((H**2.)/4.) - (y_gpos**2.))
 
         # Support Domain
-        mask, maskpos, n = SupportDomain(
-                                    x_gpos, y_gpos, dsx, dsy, xi_node, yi_node)
+        poi = x_gpos, y_gpos  # Point of interest
+        mask, maskpos, n = SupportDomain(poi, dsx, dsy, xi_node, yi_node)
 
         # Calculate MLS Shape functions
-        poi = x_gpos, y_gpos  # Point of interest
+
         phi, dphix, dphiy = MLS_ShapeFunc(
                                     poi, x_node[mask], n, dsx[mask], dsy[mask])
 
@@ -188,9 +186,9 @@ for iEBC in range(len(NodeEBC)):
     x_poi = xi_node[NodeEBC[iEBC]]
     y_poi = yi_node[NodeEBC[iEBC]]
 
-    mask, maskpos, n = SupportDomain(x_poi, y_poi, dsx, dsy, xi_node, yi_node)
-
     poi = x_poi, y_poi  # Point of interest
+    mask, maskpos, n = SupportDomain(poi, dsx, dsy, xi_node, yi_node)
+
     phi, dphix, dphiy = MLS_ShapeFunc(
                                     poi, x_node[mask], n, dsx[mask], dsy[mask])
 
@@ -216,9 +214,9 @@ for iNBC in range(len(NodeNBC_concentrated)):
     x_poi = xi_node[NodeNBC_concentrated[iNBC]]
     y_poi = yi_node[NodeNBC_concentrated[iNBC]]
 
-    mask, maskpos, n = SupportDomain(x_poi, y_poi, dsx, dsy, xi_node, yi_node)
-
     poi = x_poi, y_poi  # Point of interest
+    mask, maskpos, n = SupportDomain(poi, dsx, dsy, xi_node, yi_node)
+
     phi, dphix, dphiy = MLS_ShapeFunc(
                                     poi, x_node[mask], n, dsx[mask], dsy[mask])
 
@@ -263,9 +261,9 @@ for iNode in range(numNode):
     x_poi = xi_node[iNode]
     y_poi = yi_node[iNode]
 
-    mask, maskpos, n = SupportDomain(x_poi, y_poi, dsx, dsy, xi_node, yi_node)
-
     poi = x_poi, y_poi  # Point of interest
+    mask, maskpos, n = SupportDomain(poi, dsx, dsy, xi_node, yi_node)
+
     phi, dphix, dphiy = MLS_ShapeFunc(
                                     poi, x_node[mask], n, dsx[mask], dsy[mask])
 
@@ -303,13 +301,10 @@ for ibc in range(numBKC):
         Stress = np.zeros(3)
         Stress_exact = np.zeros(3)
         # --- Determine the support domain of Gauss point ---/
-        mask, maskpos, n = SupportDomain(
-                        x_gauss[igp], y_gauss[igp], dsx, dsy, xi_node, yi_node)
+        poi = x_gauss[igp], y_gauss[igp]        
+        mask, maskpos, n = SupportDomain(poi, dsx, dsy, xi_node, yi_node)
 
         # --- Construct MLS shape functions for a Gauss point ---/
-
-        poi = x_gauss[igp], y_gauss[igp]
-
         phi, dphix, dphiy = MLS_ShapeFunc(
                                     poi, x_node[mask], n, dsx[mask], dsy[mask])
 
@@ -356,9 +351,9 @@ for iNode in range(numNode):
     x_poi = xi_node[iNode]
     y_poi = yi_node[iNode]
 
-    mask, maskpos, n = SupportDomain(x_poi, y_poi, dsx, dsy, xi_node, yi_node)
-
     poi = x_poi, y_poi  # Point of interest
+    mask, maskpos, n = SupportDomain(poi, dsx, dsy, xi_node, yi_node)
+
     phi, dphix, dphiy = MLS_ShapeFunc(
                                     poi, x_node[mask], n, dsx[mask], dsy[mask])
 
@@ -388,7 +383,8 @@ for iNode in range(numNode):
               iNode, StressNode_exact[0][iNode], StressNode[0], StressNode_exact[1][iNode], StressNode[1], StressNode_exact[2][iNode], StressNode[2])) 
 
 # Plot to verify stress
-kk = 2    
-pp = np.where(xi_node == L)[0]
-plt.plot(yi_node[pp], StressNodeG[kk][pp], yi_node[pp], StressNode_exact[kk][pp])
+kk = 2
+pp = np.where(xi_node == L/2.)[0]
+plt.plot(yi_node[pp], StressNodeG[kk][pp],
+         yi_node[pp], StressNode_exact[kk][pp])
 plt.show()
