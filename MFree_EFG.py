@@ -4,6 +4,7 @@
 
 """
 import numpy as np
+import matplotlib.pyplot as plt
 from numpy.linalg import inv
 from gausscell import CellGaussPoints
 from MLS_functions import MLS_ShapeFunc
@@ -297,7 +298,7 @@ for ibc in range(numBKC):
     # --- Set Gauss points for this cell ---/
     x_gauss, y_gauss, weight, jac = CellGaussPoints(xe, ND)
 
-    # --- Loop over Gauss points to assemble discrete equations ---/
+    # --- Loop over Gauss points  ---/
     for igp in range(0, ngauss2D):
         Stress = np.zeros(3)
         Stress_exact = np.zeros(3)
@@ -312,7 +313,7 @@ for ibc in range(numBKC):
         phi, dphix, dphiy = MLS_ShapeFunc(
                                     poi, x_node[mask], n, dsx[mask], dsy[mask])
 
-        # --- Compute the Stiffness matrix for a Gauss point
+        # --- Compute the Stress for a Gauss point
         Bmat = np.array([]).reshape(3, 0)
         uu = np.array([]).reshape(0)
         for i in range(n):
@@ -323,7 +324,7 @@ for ibc in range(numBKC):
 
             Bmat = np.hstack([Bmat, B_i])
             I = maskpos[i]
-            uu = np.hstack([uu, disp[2*I: (2*I+1)+1]])
+            uu = np.hstack([uu, U[2*I: (2*I+1)+1]])
 
         uu = uu.reshape(2*n, 1)
         Stress = np.matmul(D, np.matmul(Bmat, uu))
@@ -347,3 +348,47 @@ for ibc in range(numBKC):
     # End of Loop for gauss points
 # End of Big Loop for background cells
 enorm = np.sqrt(enorm)
+
+# --- Compute nodal stresses
+StressNodeG = np.array([]).reshape(3, 0)
+StressNode_exact = np.zeros((3, numNode))
+for iNode in range(numNode):
+    x_poi = xi_node[iNode]
+    y_poi = yi_node[iNode]
+
+    mask, maskpos, n = SupportDomain(x_poi, y_poi, dsx, dsy, xi_node, yi_node)
+
+    poi = x_poi, y_poi  # Point of interest
+    phi, dphix, dphiy = MLS_ShapeFunc(
+                                    poi, x_node[mask], n, dsx[mask], dsy[mask])
+
+    Bmat = np.array([]).reshape(3, 0)
+    uu = np.array([]).reshape(0)
+    for i in range(n):
+
+        B_i = np.array([[dphix[i],       0.],
+                        [0.,       dphiy[i]],
+                        [dphiy[i], dphix[i]]])
+
+        Bmat = np.hstack([Bmat, B_i])
+        I = maskpos[i]
+        uu = np.hstack([uu, U[2*I: (2*I+1)+1]])
+
+    uu = uu.reshape(2*n, 1)
+    StressNode = np.matmul(D, np.matmul(Bmat, uu))
+
+    StressNodeG = np.hstack([StressNodeG, StressNode])
+    StressNode = StressNode.ravel()
+
+    StressNode_exact[0][iNode] = (1./Imo) * P * (L - x_poi) * y_poi
+    StressNode_exact[1][iNode] = 0.
+    StressNode_exact[2][iNode] = -0.5 * (P/Imo) * (0.25 * (H**2.) - y_poi**2.)
+
+    print('{:5d},   {:+0.5e},   {:+0.5e}   {:+0.5e},   {:+0.5e} {:+0.5e},   {:+0.5e}'.format(
+              iNode, StressNode_exact[0][iNode], StressNode[0], StressNode_exact[1][iNode], StressNode[1], StressNode_exact[2][iNode], StressNode[2])) 
+
+# Plot to verify stress
+kk = 2    
+pp = np.where(xi_node == L)[0]
+plt.plot(yi_node[pp], StressNodeG[kk][pp], yi_node[pp], StressNode_exact[kk][pp])
+plt.show()
